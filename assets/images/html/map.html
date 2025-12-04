@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        html, body, #map {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map and set its view to a default location
+        const map = L.map('map').setView([-3.793, 102.265], 13); // Centered on Bengkulu City
+
+        // Add a tile layer from OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Store markers in an array to manage them
+        let markers = [];
+
+        // Function to clear all existing markers from the map
+        function clearMarkers() {
+            for(let marker of markers) {
+                map.removeLayer(marker);
+            }
+            markers = [];
+        }
+
+        // Function to add new markers to the map, called from React Native
+        function addMarkersToMap(reports) {
+            clearMarkers();
+            try {
+                // The 'reports' argument is a stringified JSON array, so parse it
+                const reportData = JSON.parse(reports);
+
+                if (Array.isArray(reportData)) {
+                    reportData.forEach(report => {
+                        // Support both nested (location.lat) and flat (latitude) coordinate structures
+                        let lat, lng;
+                        
+                        if (report.location && typeof report.location.lat === 'number' && typeof report.location.lng === 'number') {
+                            lat = report.location.lat;
+                            lng = report.location.lng;
+                        } else if (typeof report.latitude === 'number' && typeof report.longitude === 'number') {
+                            lat = report.latitude;
+                            lng = report.longitude;
+                        }
+                        
+                        // Only render if valid coordinates exist
+                        if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+                            
+                            // Define custom icon based on severity
+                            const iconHtml = `<div style="background-color: ${report.color || '#FF3B30'}; width: 28px; height: 28px; border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(255, 59, 48, 0.4);"><strong style="color: white; font-size: 14px; font-weight: bold;">!</strong></div>`;
+                            const customIcon = L.divIcon({
+                                html: iconHtml,
+                                className: '',
+                                iconSize: [28, 28],
+                                iconAnchor: [14, 14]
+                            });
+
+                            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+                            
+                            // Create popup content
+                            const popupContent = `
+                                <b>Laporan Kerusakan Jalan</b><br>
+                                <b>Tingkat Kerusakan:</b> ${report.severity || 'N/A'}<br>
+                                <b>Deskripsi:</b> ${report.description || 'Tidak ada deskripsi.'}<br>
+                                <b>Validasi:</b> ${report.voteCount || 0} suara<br>
+                                <b>Koordinat:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}
+                            `;
+                            marker.bindPopup(popupContent);
+
+                            markers.push(marker);
+                        }
+                    });
+                }
+                
+                console.log('Markers added: ' + markers.length);
+            } catch (e) {
+                // Use alert for debugging in WebView
+                alert('Gagal memproses data laporan: ' + e.message);
+            }
+        }
+
+        // --- Communication with React Native ---
+        // This listener waits for messages from the React Native host
+        document.addEventListener('message', function(event) {
+            const messageData = JSON.parse(event.data);
+            if (messageData.type === 'LOAD_MARKERS') {
+                addMarkersToMap(messageData.payload);
+            }
+        });
+
+    </script>
+</body>
+</html>
