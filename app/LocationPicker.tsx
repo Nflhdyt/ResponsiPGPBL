@@ -1,31 +1,41 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { AppColors } from '@/constants/theme';
+
+// DEFINISI WARNA MANUAL (Biar Anti Error)
+const AppColors = {
+    primary: '#FF3B30',
+    background: '#FFFFFF',
+    surface: '#FFFFFF',
+    textPrimary: '#000000',
+    textOnPrimary: '#FFFFFF',
+    border: '#E0E0E0',
+    error: '#FF3B30',
+};
 
 // This is the component for the map picker screen using Leaflet in a WebView.
 const LocationPicker = () => {
   const router = useRouter();
-  const params = useLocalSearchParams<{ latitude?: string; longitude?: string }>();
+  // Ambil semua parameter (latitude, longitude, returnTo, editId)
+  const params = useLocalSearchParams();
   
   const webViewRef = useRef<WebView>(null);
 
-  const [initialLat, setInitialLat] = useState<number>(-7.7956); // Default: Yogyakarta
-  const [initialLng, setInitialLng] = useState<number>(110.3695);
+  const [initialLat, setInitialLat] = useState<number>(-3.7956); // Default Bengkulu
+  const [initialLng, setInitialLng] = useState<number>(102.2695);
   const [currentMapCenter, setCurrentMapCenter] = useState<{ lat: number; lng: number }>({
-    lat: -7.7956,
-    lng: 110.3695,
+    lat: -3.7956,
+    lng: 102.2695,
   });
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-
   useEffect(() => {
-    // Set the initial map region based on parameters passed from the previous screen
-    const lat = parseFloat(params.latitude ?? '0');
-    const lng = parseFloat(params.longitude ?? '0');
+    // Set initial map region based on params
+    const lat = parseFloat(params.latitude as string ?? '0');
+    const lng = parseFloat(params.longitude as string ?? '0');
 
     if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       setInitialLat(lat);
@@ -34,7 +44,7 @@ const LocationPicker = () => {
     }
   }, [params.latitude, params.longitude]);
 
-  // HTML content for the WebView, embedding Leaflet.js
+  // HTML content for the WebView
   const generateHtml = (lat: number, lng: number) => `
     <!DOCTYPE html>
     <html>
@@ -59,7 +69,6 @@ const LocationPicker = () => {
             }).addTo(map);
 
             map.on('load', function() {
-                // Initial center when map is fully loaded
                 var center = map.getCenter();
                 window.ReactNativeWebView.postMessage(JSON.stringify({ 
                     type: 'mapLoaded', 
@@ -77,17 +86,6 @@ const LocationPicker = () => {
                 }));
             });
 
-            // Post current center continuously while moving (optional, for finer updates)
-            // map.on('move', function() {
-            //     var center = map.getCenter();
-            //     window.ReactNativeWebView.postMessage(JSON.stringify({ 
-            //         type: 'centerMoving', 
-            //         lat: center.lat, 
-            //         lng: center.lng 
-            //     }));
-            // });
-
-            // Make sure the map resizes correctly within the WebView
             setTimeout(function () {
                 map.invalidateSize();
             }, 100);
@@ -96,33 +94,53 @@ const LocationPicker = () => {
     </html>
   `;
 
-  // Handle messages coming from the WebView (Leaflet map)
   const onMessage = (event: any) => {
-    const data = JSON.parse(event.nativeEvent.data);
-    if (data.type === 'mapLoaded' || data.type === 'centerChange') {
-      setCurrentMapCenter({ lat: data.lat, lng: data.lng });
-      setIsMapLoaded(true);
+    try {
+        const data = JSON.parse(event.nativeEvent.data);
+        if (data.type === 'mapLoaded' || data.type === 'centerChange') {
+          setCurrentMapCenter({ lat: data.lat, lng: data.lng });
+          setIsMapLoaded(true);
+        }
+    } catch (e) {
+        console.log("Error parsing map message");
     }
   };
 
+  // --- LOGIC KONFIRMASI LOKASI (YANG SUDAH DIPERBAIKI) ---
   const handleConfirmLocation = () => {
-    // Navigate back to the form screen with the selected coordinates
-    router.replace({
-      pathname: '/forminputlocation',
-      params: {
-        latitude: currentMapCenter.lat.toString(),
-        longitude: currentMapCenter.lng.toString(),
-      },
-    });
+    // 1. Cek apakah kita datang dari halaman EDIT?
+    if (params.returnTo === 'edit') {
+        
+        console.log("↩️ Balik ke Form Edit bawa ID:", params.editId);
+        
+        // Pulang ke Form Edit (Bawa ID biar gak error)
+        router.replace({
+            pathname: "/formeditlocation",
+            params: {
+                latitude: currentMapCenter.lat.toString(),
+                longitude: currentMapCenter.lng.toString(),
+                id: params.editId // <--- PENTING! Ini yang bikin dia gak jadi data baru
+            },
+        });
+
+    } else {
+        // 2. Default: Pulang ke Form Input (Buat Baru)
+        console.log("↩️ Balik ke Form Input (Create)");
+        router.replace({
+            pathname: "/forminputlocation",
+            params: {
+                latitude: currentMapCenter.lat.toString(),
+                longitude: currentMapCenter.lng.toString(),
+            },
+        });
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen options={{ title: 'Pilih Lokasi dari Peta' }} />
       
-      {/* Map Container */}
       <View style={styles.mapViewContainer}>
-        {/* WebView rendering the Leaflet map */}
         <WebView
           ref={webViewRef}
           originWhitelist={['*']}
@@ -130,11 +148,9 @@ const LocationPicker = () => {
           javaScriptEnabled={true}
           onMessage={onMessage}
           style={styles.webView}
-          onLoadEnd={() => console.log("WebView loaded")}
-          onError={(syntheticEvent) => console.error('WebView error: ', syntheticEvent.nativeEvent)}
         />
         
-        {/* Fixed Pin Marker in the center */}
+        {/* Pin Tengah */}
         {isMapLoaded && (
           <View style={styles.fixedPin} pointerEvents="none">
             <Feather name="map-pin" size={40} color={AppColors.error} />
@@ -149,7 +165,7 @@ const LocationPicker = () => {
         )}
       </View>
 
-      {/* Confirmation Button */}
+      {/* Tombol Konfirmasi */}
       <View style={styles.buttonContainer}>
         <Pressable style={styles.button} onPress={handleConfirmLocation}>
           <Text style={styles.buttonText}>Konfirmasi Lokasi</Text>
@@ -166,7 +182,7 @@ const styles = StyleSheet.create({
   },
   mapViewContainer: {
     flex: 1,
-    position: 'relative', // Needed for absolute positioning of the pin
+    position: 'relative', 
   },
   webView: {
     flex: 1,
@@ -175,17 +191,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    // Adjust these based on the icon's size to perfectly center it
-    marginLeft: -20, // Half of icon width (40/2)
-    marginTop: -40, // Icon height (40) if anchor is bottom-center, or -20 for center
-    zIndex: 1, // Ensure pin is above the map
+    marginLeft: -20, 
+    marginTop: -40, 
+    zIndex: 1, 
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: AppColors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2, // Ensure loading overlay is on top
+    zIndex: 2, 
   },
   loadingText: {
     marginTop: 10,
@@ -208,6 +223,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-});
+}); 
 
 export default LocationPicker;

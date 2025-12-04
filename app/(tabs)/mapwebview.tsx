@@ -1,10 +1,10 @@
-import { FAB } from '@/components/ui/FAB';
 import { db } from '@/firebaseConfig';
 import { useMapReports } from '@/hooks/useMapReports';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { deleteDoc, doc } from 'firebase/firestore';
-import React, { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { RefreshCw } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const mapHtml = require('../../assets/images/html/map.html');
@@ -13,69 +13,70 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const { reports, loading, refetch } = useMapReports(); 
   const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // 1. AUTO REFRESH SAAT LAYAR DIBUKA KEMBALI
+  // Auto Refresh
   useFocusEffect(
     useCallback(() => {
-      console.log("Layar Peta Fokus -> Refresh Data...");
       if (refetch) refetch();
-    }, []) 
+    }, [])
   );
 
-  // 2. FUNGSI UPDATE MARKER
+  // Update Peta
   const updateMapMarkers = () => {
     if (webViewRef.current && reports) {
-      const script = `addMarkersToMap(${JSON.stringify(reports)});`;
-      webViewRef.current.injectJavaScript(script);
+        const script = `addMarkersToMap(${JSON.stringify(reports)});`;
+        webViewRef.current.injectJavaScript(script);
     }
   };
 
-  // Update otomatis setiap kali data berubah
-  useEffect(() => {
-    updateMapMarkers();
-  }, [reports]);
+  useEffect(() => { updateMapMarkers(); }, [reports]);
 
+  // Refresh Manual
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    if (webViewRef.current) webViewRef.current.reload(); 
+    if (refetch) {
+        refetch().finally(() => setTimeout(() => setIsRefreshing(false), 1500));
+    }
+  };
+
+  // --- HANDLE PESAN DARI HTML ---
   const handleWebViewMessage = async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data); 
       
       if (data.type === 'DELETE') {
-        // --- LOGIKA DELETE ---
-        Alert.alert(
-            "Hapus Laporan?",
-            "Yakin ingin menghapus laporan ini?",
-            [
-                { text: "Batal", style: "cancel" },
-                { 
-                    text: "Hapus", 
-                    style: "destructive", 
-                    onPress: async () => {
-                        try {
-                            await deleteDoc(doc(db, "reports", data.id));
-                            if (refetch) {
-                                await refetch();
-                                Alert.alert("Sukses", "Marker dihapus dari peta.");
-                            }
-                        } catch (error) {
-                            Alert.alert("Error", "Gagal menghapus data.");
-                        }
-                    }
+        Alert.alert("Hapus Laporan?", "Yakin?", [
+            { text: "Batal", style: "cancel" },
+            { 
+                text: "Hapus", style: "destructive", 
+                onPress: async () => {
+                    try {
+                        await deleteDoc(doc(db, "reports", data.id));
+                        if (refetch) await refetch();
+                        Alert.alert("Sukses", "Terhapus.");
+                    } catch (e) { Alert.alert("Error", "Gagal hapus."); }
                 }
-            ]
-        );
+            }
+        ]);
       } 
       else if (data.type === 'EDIT') {
-        console.log("Navigasi ke Form Edit ID:", data.id);
+        // CEK DULU ID NYA ADA GAK
+        if (!data.id) {
+            Alert.alert("Error", "ID Laporan tidak terbaca dari peta.");
+            return;
+        }
+
+        console.log("Navigasi ke Form Edit dengan ID:", data.id);
         
+        // Pindah ke Form Edit
         router.push({ 
-            pathname: "/formeditlocation",
+            pathname: "/formeditlocation", 
             params: { id: data.id } 
         });
       }
-
-    } catch (e) {
-      console.log("Error parsing message", e);
-    }
+    } catch (e) { console.log("Error msg:", e); }
   };
 
   return (
@@ -87,18 +88,17 @@ export default function MapScreen() {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         originWhitelist={['*']}
-        onLoadEnd={updateMapMarkers}
+        onLoadEnd={() => { if(reports) updateMapMarkers(); }}
         onMessage={handleWebViewMessage} 
       />
-
-      {loading && (
+      {(loading || isRefreshing) && (
         <View style={styles.loadingOverlay}>
-          {}
           <ActivityIndicator size="large" color={'#FF3B30'} />
         </View>
       )}
-
-      <FAB />
+      <TouchableOpacity style={styles.refreshButton} onPress={handleManualRefresh} activeOpacity={0.8}>
+        <RefreshCw size={24} color="#FFFFFF" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -106,9 +106,6 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   webview: { flex: 1 },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center', alignItems: 'center', zIndex: 10,
-  },
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 20 },
+  refreshButton: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', elevation: 6, zIndex: 10 }
 });

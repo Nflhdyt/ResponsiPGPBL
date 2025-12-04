@@ -7,19 +7,13 @@ import { auth, db } from '@/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection } from 'firebase/firestore'; // CUMA ADA ADD
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-const AppColors = {
-    primary: '#FF3B30',
-    background: '#FFFFFF',
-    surface: '#FFFFFF',
-    textPrimary: '#000000',
-    textSecondary: '#666666',
-};
-
+// Warna Manual
+const AppColors = { primary: '#FF3B30', background: '#FFFFFF', surface: '#FFFFFF', textPrimary: '#000000', textSecondary: '#666666' };
 const CLOUD_NAME = 'ddlxrhe9n';
 const UPLOAD_PRESET = 'bengkulu';
 const API_KEY = '737357581632975';
@@ -31,73 +25,21 @@ const FormInputLocationScreen = () => {
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'Light' | 'Medium' | 'Heavy'>('Medium');
   const [isLoading, setIsLoading] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false); 
-  
-  // --- PENYELAMAT: SIMPAN ID DI STATE BIAR GAK HILANG ---
-  const [targetId, setTargetId] = useState<string | null>(null);
-
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // --- 1. LOGIC LOAD DATA ---
+  // Cek parameter lokasi dari peta picker
   useEffect(() => {
-    // Cek apakah ada ID di parameter navigasi
-    const paramId = Array.isArray(params.id) ? params.id[0] : params.id;
-
-    // JIKA ADA ID (Artinya Mode Edit), DAN KITA BELUM MENYIMPANNYA
-    // Maka simpan ke targetId. Ini mencegah ID hilang saat navigasi balik dari peta.
-    if (paramId && !targetId) {
-      console.log("🔒 ID DITANGKAP & DIKUNCI:", paramId);
-      setTargetId(paramId); // KUNCI ID DI SINI
-      setIsEditMode(true);
-      fetchReportData(paramId);
-    }
-    
-    // Cek parameter lokasi (kalau balik dari map picker)
     if (params.latitude && params.longitude) {
       setLatitude(params.latitude as string);
       setLongitude(params.longitude as string);
     }
-  }, [params.id, params.latitude, params.longitude]);
+  }, [params.latitude, params.longitude]);
 
-  const fetchReportData = async (reportId: string) => {
-    setIsLoading(true);
-    try {
-      const docRef = doc(db, 'reports', reportId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setImageUri(data.imageUrl);
-        
-        // Handle latitude/longitude
-        if (data.location?.latitude) {
-            setLatitude(String(data.location.latitude));
-            setLongitude(String(data.location.longitude));
-        } else {
-            setLatitude(String(data.latitude || ''));
-            setLongitude(String(data.longitude || ''));
-        }
-        
-        setDescription(data.description || '');
-        setSeverity(data.severity || 'Medium');
-      } else {
-        Alert.alert("Error", "Data laporan tidak ditemukan.");
-        router.back();
-      }
-    } catch (error) {
-      Alert.alert("Error", "Gagal memuat data edit.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ... (Fungsi pendukung lainnya sama aja) ...
+  // --- LOGIC GAMBAR & LOKASI ---
   const pickImageFromGallery = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.3, 
-      });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.3 });
       if (!result.canceled) setImageUri(result.assets[0].uri);
     } catch (error) { Alert.alert('Error', 'Gagal membuka galeri.'); }
   };
@@ -114,11 +56,11 @@ const FormInputLocationScreen = () => {
   };
 
   const openMapPicker = () => {
-    router.push({ pathname: '/LocationPicker', params: { latitude, longitude } });
+    // Navigasi ke Peta (Mode Create)
+    router.push({ pathname: '/LocationPicker', params: { latitude, longitude, returnTo: 'create' } });
   };
 
   const uploadImageToCloudinary = async (uri: string) => {
-    if (uri.startsWith('http')) return uri; 
     const formData = new FormData();
     let filename = uri.split('/').pop();
     let match = /\.(\w+)$/.exec(filename || '');
@@ -133,56 +75,28 @@ const FormInputLocationScreen = () => {
     return data.secure_url;
   };
 
-  // --- LOGIC SUBMIT (DIPERBAIKI PAKE TARGET ID) ---
+  // --- LOGIC SUBMIT (HANYA CREATE) ---
   const handleSubmit = async () => {
     if (!imageUri || !latitude || !longitude || !description.trim()) {
-      Alert.alert('Error', 'Mohon lengkapi semua data.');
-      return;
+      return Alert.alert('Error', 'Mohon lengkapi semua data.');
     }
-
     setIsLoading(true);
-
     try {
       const uploadedUrl = await uploadImageToCloudinary(imageUri);
-
-      const reportData: any = {
+      const reportData = {
         imageUrl: uploadedUrl,
-        location: {
-          latitude: parseFloat(latitude), 
-          longitude: parseFloat(longitude),
-        },
-        severity,
-        description,
-        timestamp: new Date(), 
+        location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) },
+        severity, description, timestamp: new Date(),
+        userId: auth.currentUser?.uid || 'anonymous',
+        voteCount: 0
       };
 
-      if (isEditMode && targetId) {
-        
-        console.log("Melakukan UPDATE pada ID:", targetId);
-        
-        const docRef = doc(db, 'reports', targetId);
-        await updateDoc(docRef, reportData);
-        
-        Alert.alert('Sukses', 'Data LAMA berhasil diperbarui!', [
-            { text: 'OK', onPress: () => router.back() } 
-        ]);
-        
-      } else {
-        
-        console.log("Melakukan CREATE NEW DATA");
-        
-        reportData.userId = auth.currentUser?.uid || 'anonymous';
-        reportData.voteCount = 0;
-        await addDoc(collection(db, 'reports'), reportData);
-        
-        Alert.alert('Sukses', 'Laporan BARU berhasil dikirim!', [
-            { text: 'OK', onPress: () => router.back() } 
-        ]);
-      }
-
+      // PASTI ADD DOC (CREATE)
+      await addDoc(collection(db, 'reports'), reportData);
+      
+      Alert.alert('Sukses', 'Laporan berhasil dikirim!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (error: any) {
-      console.error('Error submitting:', error);
-      Alert.alert('Gagal', `Terjadi kesalahan: ${error.message}`);
+      Alert.alert('Gagal', error.message);
     } finally {
       setIsLoading(false);
     }
@@ -191,40 +105,15 @@ const FormInputLocationScreen = () => {
   return (
     <SafeAreaProvider style={{ backgroundColor: AppColors.background }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <Stack.Screen options={{ 
-            title: isEditMode ? 'Edit Laporan' : 'Buat Laporan Baru', 
-            headerShadowVisible: false, 
-            headerStyle: { backgroundColor: AppColors.surface }, 
-            headerTintColor: AppColors.textPrimary 
-        }} />
-        
-        <ScrollView contentContainerStyle={globalStyles.container} showsVerticalScrollIndicator={false}>
+        <Stack.Screen options={{ title: 'Buat Laporan Baru', headerStyle: { backgroundColor: AppColors.surface }, headerTintColor: AppColors.textPrimary }} />
+        <ScrollView contentContainerStyle={globalStyles.container}>
           <ImagePickerCard imageUri={imageUri} onPress={pickImageFromGallery} isLoading={isLoading} />
-          <LocationCard
-            latitude={latitude}
-            longitude={longitude}
-            onLatitudeChange={setLatitude}
-            onLongitudeChange={setLongitude}
-            onGetLocation={getMyLocation}
-            onOpenMapPicker={openMapPicker}
-            isLoading={isLoading}
-          />
-          <DetailsCard
-            severity={severity}
-            onSeverityChange={setSeverity}
-            description={description}
-            onDescriptionChange={setDescription}
-            isLoading={isLoading}
-          />
-          <SubmitButton 
-            onPress={handleSubmit} 
-            isLoading={isLoading} 
-            label={isEditMode ? "Simpan Perubahan" : "Kirim Laporan"} 
-          />
+          <LocationCard latitude={latitude} longitude={longitude} onLatitudeChange={setLatitude} onLongitudeChange={setLongitude} onGetLocation={getMyLocation} onOpenMapPicker={openMapPicker} isLoading={isLoading} />
+          <DetailsCard severity={severity} onSeverityChange={setSeverity} description={description} onDescriptionChange={setDescription} isLoading={isLoading} />
+          <SubmitButton onPress={handleSubmit} isLoading={isLoading} label="Kirim Laporan" />
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
   );
 };
-
 export default FormInputLocationScreen;

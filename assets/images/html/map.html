@@ -9,9 +9,11 @@
         html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; }
         .leaflet-popup-content-wrapper { border-radius: 8px; padding: 0; }
         .leaflet-popup-content { margin: 0 !important; width: 240px !important; }
+        
+        /* Style Tombol Aksi */
         .btn-action {
-            border: none; padding: 6px 12px; border-radius: 4px; color: white; 
-            font-size: 11px; font-weight: bold; cursor: pointer; flex: 1;
+            border: none; padding: 8px 0; border-radius: 4px; color: white; 
+            font-size: 11px; font-weight: bold; cursor: pointer; flex: 1; text-align: center;
         }
         .btn-edit { background-color: #007AFF; margin-right: 4px; }
         .btn-delete { background-color: #FF3B30; margin-left: 4px; }
@@ -22,45 +24,63 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
         const map = L.map('map').setView([-3.793, 102.265], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 
-        let markers = [];
+        let markers = []; // Array penyimpanan marker
 
-        // --- FUNGSI KIRIM SINYAL KE REACT NATIVE ---
+        // FUNGSI KOMUNIKASI KE REACT NATIVE
         function sendAction(type, id) {
             if (window.ReactNativeWebView) {
-                // Kirim data JSON: { type: 'DELETE', id: 'abc12345' }
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: type, id: id }));
-            } else {
-                alert("Fitur ini hanya jalan di aplikasi HP!");
             }
         }
 
+        // FUNGSI BERSIHKAN MARKER (PENTING!)
+        function clearMarkers() {
+            // Loop semua marker yang ada dan hapus dari peta
+            for(let i = 0; i < markers.length; i++) {
+                map.removeLayer(markers[i]);
+            }
+            markers = []; // Kosongkan array
+        }
+
+        // FUNGSI UTAMA RENDER
         function addMarkersToMap(reportsData) {
-            // Hapus marker lama
-            markers.forEach(m => map.removeLayer(m));
-            markers = [];
+            clearMarkers();
             
             try {
                 const data = reportsData;
+
+                // Jika data kosong/null, fungsi berhenti disini (peta sudah bersih karena clearMarkers diatas)
+                if (!data || data.length === 0) return;
+
                 if (Array.isArray(data)) {
                     data.forEach(report => {
                         let lat, lng;
-                        // Logic Koordinat
-                        if (report.location?.latitude) { lat = parseFloat(report.location.latitude); lng = parseFloat(report.location.longitude); }
-                        else if (report.location?.lat) { lat = parseFloat(report.location.lat); lng = parseFloat(report.location.lng); }
-                        else { lat = parseFloat(report.latitude); lng = parseFloat(report.longitude); }
+                        
+                        // Logic Koordinat (Support Nested & Flat)
+                        if (report.location && report.location.latitude) {
+                            lat = parseFloat(report.location.latitude);
+                            lng = parseFloat(report.location.longitude);
+                        } else if (report.location && report.location.lat) {
+                             lat = parseFloat(report.location.lat);
+                             lng = parseFloat(report.location.lng);
+                        } else {
+                            lat = parseFloat(report.latitude);
+                            lng = parseFloat(report.longitude);
+                        }
                         
                         if (!isNaN(lat) && !isNaN(lng)) {
                             const color = report.color || '#FF3B30';
                             
-                            // HTML Bagian Foto
+                            // HTML Image Logic
                             let imageHtml = report.imageUrl ? 
                                 `<div style="width: 100%; height: 130px; overflow: hidden; border-top-left-radius: 8px; border-top-right-radius: 8px; background: #eee;">
                                     <img src="${report.imageUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
                                 </div>` : 
-                                `<div style="height: 40px; background: #f0f0f0; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color:#999;">No Image</div>`;
+                                `<div style="width: 100%; height: 40px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 11px; color:#999;">No Image</div>`;
 
+                            // Template Popup
                             const popupContent = `
                                 <div style="font-family: sans-serif; font-size: 13px; color: #333;">
                                     ${imageHtml}
@@ -71,16 +91,15 @@
                                             </span>
                                         </div>
                                         <div style="margin-bottom: 6px;">
-                                            <span style="color: #666; font-size: 11px; font-weight: bold;">Keterangan:</span><br>
+                                            <b>Keterangan:</b><br>
                                             <span style="line-height: 1.3;">${report.description || '-'}</span>
                                         </div>
                                         <div style="margin-bottom: 6px;">
-                                            <span style="color: #666; font-size: 11px; font-weight: bold;">Koordinat:</span><br>
+                                            <b>Koordinat:</b><br>
                                             <span style="font-family: monospace; background: #f4f4f4;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
                                         </div>
-                                        <div style="margin-top: 8px; display: flex; align-items: center;">
-                                            <span style="color: #666; font-size: 11px; font-weight: bold; margin-right: 5px;">Validasi:</span>
-                                            <span style="font-weight: bold; color: #333;">👍 ${report.voteCount || 0}</span>
+                                        <div style="margin-top: 8px;">
+                                            <b>Validasi:</b> 👍 ${report.voteCount || 0}
                                         </div>
                                         
                                         <div style="margin-top: 12px; display: flex; border-top: 1px solid #eee; padding-top: 8px;">
@@ -91,12 +110,22 @@
                                 </div>
                             `;
 
+                            // Style Marker
                             const iconHtml = `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`;
                             const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
                             
-                            L.marker([lat, lng], { icon: customIcon }).addTo(map).bindPopup(popupContent);
+                            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+                            marker.bindPopup(popupContent);
+                            
+                            markers.push(marker);
                         }
                     });
+                    
+                    // Fit Bounds (Zoom Otomatis ke area marker)
+                    if (markers.length > 0) {
+                        const group = new L.featureGroup(markers);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
                 }
             } catch (e) { console.error(e); }
         }
