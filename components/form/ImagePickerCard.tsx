@@ -1,8 +1,16 @@
 import { globalStyles } from '@/constants/styles';
-import { AppColors } from '@/constants/theme';
-import { ImageIcon } from 'lucide-react-native';
+// import { AppColors } from '@/constants/theme'; // <-- INI YANG BIKIN ERROR
+// Kita import Image dari lucide tapi ganti nama jadi ImageIcon biar gak bentrok
+import { Image as ImageIcon } from 'lucide-react-native';
 import React from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// --- WARNA MANUAL (ANTI ERROR) ---
+const Colors = {
+  primary: '#FF3B30',
+  inputBackground: '#F5F5F5',
+  textSecondary: '#666666',
+};
 
 interface ImagePickerCardProps {
   imageUri: string | null;
@@ -17,20 +25,20 @@ export const ImagePickerCard: React.FC<ImagePickerCardProps> = ({ imageUri, onPr
       <View>
         <Image source={{ uri: imageUri }} style={styles.imagePreview} />
         <TouchableOpacity style={globalStyles.outlineButton} onPress={onPress} disabled={isLoading}>
-          <ImageIcon size={18} color={AppColors.primary} />
+          <ImageIcon size={18} color={Colors.primary} />
           <Text style={globalStyles.outlineButtonText}>Ganti Foto</Text>
         </TouchableOpacity>
       </View>
     ) : (
       <TouchableOpacity style={styles.imagePicker} onPress={onPress} disabled={isLoading}>
-        <ImageIcon size={32} color={AppColors.primary} />
+        <ImageIcon size={32} color={Colors.primary} />
         <Text style={styles.imagePickerText}>Pilih Foto Kerusakan</Text>
       </TouchableOpacity>
     )}
   </View>
 );
 
-const styles = {
+const styles = StyleSheet.create({
   imagePreview: {
     width: '100%',
     height: 200,
@@ -41,15 +49,15 @@ const styles = {
     height: 150,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: AppColors.primary,
+    borderColor: Colors.primary,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: AppColors.inputBackground,
+    backgroundColor: Colors.inputBackground,
   },
   imagePickerText: {
     marginTop: 8,
     fontSize: 14,
-    color: AppColors.textSecondary,
+    color: Colors.textSecondary,
   },
-};
+});

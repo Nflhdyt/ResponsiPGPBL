@@ -1,45 +1,48 @@
 import { FAB } from '@/components/ui/FAB';
-import { AppColors } from '@/constants/theme';
-import { db } from '@/firebaseConfig'; // Database kamu
+import { db } from '@/firebaseConfig';
 import { useMapReports } from '@/hooks/useMapReports';
-import { useRouter } from 'expo-router'; // Buat navigasi
-import { deleteDoc, doc } from 'firebase/firestore'; // Buat hapus data
-import React, { useEffect, useRef } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { deleteDoc, doc } from 'firebase/firestore';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-// Pastikan path ini benar sesuai struktur folder kamu
 const mapHtml = require('../../assets/images/html/map.html');
 
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
-  
-  // Pastikan hook useMapReports kamu sudah meng-return 'refetch'
   const { reports, loading, refetch } = useMapReports(); 
   const router = useRouter();
 
-  // Fungsi untuk menyuntikkan data marker ke HTML
+  // 1. AUTO REFRESH SAAT LAYAR DIBUKA KEMBALI
+  useFocusEffect(
+    useCallback(() => {
+      console.log("Layar Peta Fokus -> Refresh Data...");
+      if (refetch) refetch();
+    }, []) 
+  );
+
+  // 2. FUNGSI UPDATE MARKER
   const updateMapMarkers = () => {
-    if (webViewRef.current && reports.length > 0) {
+    if (webViewRef.current && reports) {
       const script = `addMarkersToMap(${JSON.stringify(reports)});`;
       webViewRef.current.injectJavaScript(script);
     }
   };
 
-  // Update marker setiap kali data reports berubah
+  // Update otomatis setiap kali data berubah
   useEffect(() => {
     updateMapMarkers();
   }, [reports]);
 
-  // --- FUNGSI UTAMA: MENANGANI KLIK TOMBOL DARI HTML ---
   const handleWebViewMessage = async (event: any) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data); // Baca data { type, id }
+      const data = JSON.parse(event.nativeEvent.data); 
       
       if (data.type === 'DELETE') {
-        // Logika Hapus dengan Konfirmasi
+        // --- LOGIKA DELETE ---
         Alert.alert(
-            "Konfirmasi Hapus",
+            "Hapus Laporan?",
             "Yakin ingin menghapus laporan ini?",
             [
                 { text: "Batal", style: "cancel" },
@@ -48,19 +51,12 @@ export default function MapScreen() {
                     style: "destructive", 
                     onPress: async () => {
                         try {
-                            // 1. Hapus dari Firestore
                             await deleteDoc(doc(db, "reports", data.id));
-                            Alert.alert("Sukses", "Laporan berhasil dihapus.");
-                            
-                            // 2. Refresh Data & Peta
                             if (refetch) {
-                                refetch(); 
-                            } else {
-                                console.warn("Fungsi refetch belum ada di hook useMapReports!");
+                                await refetch();
+                                Alert.alert("Sukses", "Marker dihapus dari peta.");
                             }
-                            
                         } catch (error) {
-                            console.error(error);
                             Alert.alert("Error", "Gagal menghapus data.");
                         }
                     }
@@ -68,17 +64,17 @@ export default function MapScreen() {
             ]
         );
       } 
-      
       else if (data.type === 'EDIT') {
-        // Logika Edit -> Cuma Alert dulu (nanti bisa diarahkan ke form edit)
-        Alert.alert("Info", "Fitur Edit ID: " + data.id);
+        console.log("Navigasi ke Form Edit ID:", data.id);
         
-        // Contoh kalau mau pindah ke halaman form:
-        // router.push({ pathname: "/forminputlocation", params: { id: data.id, isEdit: 'true' } });
+        router.push({ 
+            pathname: "/formeditlocation",
+            params: { id: data.id } 
+        });
       }
 
     } catch (e) {
-      console.log("Error parsing message from WebView", e);
+      console.log("Error parsing message", e);
     }
   };
 
@@ -91,15 +87,14 @@ export default function MapScreen() {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         originWhitelist={['*']}
-        // Saat loading selesai, injek data marker
         onLoadEnd={updateMapMarkers}
-        // PENTING: Menerima pesan dari tombol HTML
         onMessage={handleWebViewMessage} 
       />
 
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={AppColors.primary || '#FF3B30'} />
+          {}
+          <ActivityIndicator size="large" color={'#FF3B30'} />
         </View>
       )}
 

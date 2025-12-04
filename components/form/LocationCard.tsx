@@ -1,8 +1,15 @@
-import { globalStyles } from '@/constants/styles';
-import { AppColors } from '@/constants/theme';
 import { Map, MapPin } from 'lucide-react-native';
 import React from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+// Warna Manual
+const Colors = {
+  primary: '#FF3B30',
+  textPrimary: '#000000',
+  textSecondary: '#666666',
+  inputBackground: '#F5F5F5',
+  cardBackground: '#FFFFFF',
+};
 
 interface LocationCardProps {
   latitude: string;
@@ -23,47 +30,93 @@ export const LocationCard: React.FC<LocationCardProps> = ({
   onOpenMapPicker,
   isLoading,
 }) => (
-  <View style={globalStyles.card}>
-    <Text style={globalStyles.cardTitle}>Lokasi GPS</Text>
+  <View style={styles.card}>
+    <Text style={styles.cardTitle}>Lokasi GPS</Text>
+    
     <View style={styles.inputGroup}>
       <TextInput
-        style={globalStyles.input}
+        style={styles.input}
         placeholder="Latitude"
         value={latitude}
         onChangeText={onLatitudeChange}
-        keyboardType="decimal-pad"
-        placeholderTextColor={AppColors.textSecondary}
+        keyboardType="numeric" 
+        placeholderTextColor={Colors.textSecondary}
+        editable={!isLoading}
       />
       <TextInput
-        style={globalStyles.input}
+        style={styles.input}
         placeholder="Longitude"
         value={longitude}
         onChangeText={onLongitudeChange}
-        keyboardType="decimal-pad"
-        placeholderTextColor={AppColors.textSecondary}
+        keyboardType="numeric"
+        placeholderTextColor={Colors.textSecondary}
+        editable={!isLoading}
       />
     </View>
+
     <View style={styles.buttonContainer}>
-      <TouchableOpacity style={[globalStyles.outlineButton, { flex: 1 }]} onPress={onGetLocation} disabled={isLoading}>
-        <MapPin size={18} color={AppColors.primary} />
-        <Text style={globalStyles.outlineButtonText}>Dapatkan Lokasi Saya</Text>
+      <TouchableOpacity style={styles.outlineButton} onPress={onGetLocation} disabled={isLoading}>
+        <MapPin size={18} color={Colors.primary} />
+        <Text style={styles.outlineButtonText}>Lokasi Saya</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[globalStyles.outlineButton, { flex: 1 }]} onPress={onOpenMapPicker} disabled={isLoading}>
-        <Map size={18} color={AppColors.primary} />
-        <Text style={globalStyles.outlineButtonText}>Pilih Lewat Peta</Text>
+      
+      <TouchableOpacity style={styles.outlineButton} onPress={onOpenMapPicker} disabled={isLoading}>
+        <Map size={18} color={Colors.primary} />
+        <Text style={styles.outlineButtonText}>Pilih Peta</Text>
       </TouchableOpacity>
     </View>
   </View>
 );
 
-const styles = {
-    inputGroup: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 12,
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-};
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    marginBottom: 12,
+  },
+  inputGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: Colors.inputBackground,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  outlineButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    gap: 6,
+  },
+  outlineButtonText: {
+    color: Colors.primary,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+});
