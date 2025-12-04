@@ -13,70 +13,88 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const { reports, loading, refetch } = useMapReports(); 
   const router = useRouter();
+  
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Auto Refresh
+  // 1. AUTO REFRESH (Ringan)
   useFocusEffect(
     useCallback(() => {
       if (refetch) refetch();
     }, [])
   );
 
-  // Update Peta
+  // 2. LOGIC UPDATE MARKER (Cerdas)
   const updateMapMarkers = () => {
+    // Kita kirim data reports terbaru ke HTML
+    // Walaupun data kosong [], dia akan otomatis menghapus semua marker lama
     if (webViewRef.current && reports) {
-        const script = `addMarkersToMap(${JSON.stringify(reports)});`;
-        webViewRef.current.injectJavaScript(script);
+      const script = `addMarkersToMap(${JSON.stringify(reports)});`;
+      webViewRef.current.injectJavaScript(script);
     }
   };
 
-  useEffect(() => { updateMapMarkers(); }, [reports]);
+  // Jalan otomatis saat data reports berubah
+  useEffect(() => {
+    updateMapMarkers();
+  }, [reports]);
 
-  // Refresh Manual
-  const handleManualRefresh = () => {
+  // 3. MANUAL REFRESH (OPTIMASI: SOFT REFRESH)
+  const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    if (webViewRef.current) webViewRef.current.reload(); 
+    
+    // --- PERBAIKAN DISINI ---
+    // Jangan pakai reload()! Itu bikin berat dan layar putih.
+    // Cukup tarik data baru, nanti useEffect di atas akan otomatis update gambarnya.
+    
     if (refetch) {
-        refetch().finally(() => setTimeout(() => setIsRefreshing(false), 1500));
+        try {
+            await refetch(); // Tunggu data baru
+            // updateMapMarkers(); // Opsional, karena useEffect sudah menanganinya
+            Alert.alert("Sukses", "Data peta berhasil diperbarui (Mode Ringan).");
+        } catch (e) {
+            Alert.alert("Gagal", "Tidak bisa memperbarui data.");
+        }
     }
+    
+    setIsRefreshing(false);
   };
 
-  // --- HANDLE PESAN DARI HTML ---
   const handleWebViewMessage = async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data); 
       
       if (data.type === 'DELETE') {
-        Alert.alert("Hapus Laporan?", "Yakin?", [
-            { text: "Batal", style: "cancel" },
-            { 
-                text: "Hapus", style: "destructive", 
-                onPress: async () => {
-                    try {
-                        await deleteDoc(doc(db, "reports", data.id));
-                        if (refetch) await refetch();
-                        Alert.alert("Sukses", "Terhapus.");
-                    } catch (e) { Alert.alert("Error", "Gagal hapus."); }
+        Alert.alert(
+            "Konfirmasi Hapus",
+            "Laporan akan dihapus permanen.",
+            [
+                { text: "Batal", style: "cancel" },
+                { 
+                    text: "Hapus", 
+                    style: "destructive", 
+                    onPress: async () => {
+                        try {
+                            await deleteDoc(doc(db, "reports", data.id));
+                            if (refetch) await refetch();
+                            Alert.alert("Sukses", "Marker dihapus.");
+                        } catch (error) {
+                            Alert.alert("Error", "Gagal menghapus data.");
+                        }
+                    }
                 }
-            }
-        ]);
+            ]
+        );
       } 
       else if (data.type === 'EDIT') {
-        // CEK DULU ID NYA ADA GAK
-        if (!data.id) {
-            Alert.alert("Error", "ID Laporan tidak terbaca dari peta.");
-            return;
-        }
-
-        console.log("Navigasi ke Form Edit dengan ID:", data.id);
-        
-        // Pindah ke Form Edit
         router.push({ 
             pathname: "/formeditlocation", 
             params: { id: data.id } 
         });
       }
-    } catch (e) { console.log("Error msg:", e); }
+
+    } catch (e) {
+      console.log("Error parsing message", e);
+    }
   };
 
   return (
@@ -88,17 +106,25 @@ export default function MapScreen() {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         originWhitelist={['*']}
-        onLoadEnd={() => { if(reports) updateMapMarkers(); }}
+        onLoadEnd={updateMapMarkers}
         onMessage={handleWebViewMessage} 
       />
+
       {(loading || isRefreshing) && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={'#FF3B30'} />
         </View>
       )}
-      <TouchableOpacity style={styles.refreshButton} onPress={handleManualRefresh} activeOpacity={0.8}>
+
+      {/* Tombol Refresh Biru */}
+      <TouchableOpacity 
+        style={styles.refreshButton} 
+        onPress={handleManualRefresh}
+        activeOpacity={0.8}
+      >
         <RefreshCw size={24} color="#FFFFFF" />
       </TouchableOpacity>
+
     </View>
   );
 }
@@ -106,6 +132,16 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   webview: { flex: 1 },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 20 },
-  refreshButton: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', elevation: 6, zIndex: 10 }
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)', // Transparansi lebih tinggi biar gak ganggu
+    justifyContent: 'center', alignItems: 'center', zIndex: 20,
+  },
+  refreshButton: {
+    position: 'absolute',
+    bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28,
+    backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center',
+    elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.3, shadowRadius: 4, zIndex: 10,
+  }
 });

@@ -6,7 +6,6 @@ import { globalStyles } from '@/constants/styles';
 import { db } from '@/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-// --- PERBAIKAN DI SINI: Tambahkan 'Stack' ke dalam import ---
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
@@ -31,6 +30,16 @@ const FormEditLocationScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  // --- OPTIMASI GAMBAR (Agar Load Cepat) ---
+  const getOptimizedUrl = (url: string | null) => {
+    if (!url) return null;
+    // Jika url dari Cloudinary, kita minta versi kecil (width 600, quality auto)
+    if (url.includes('cloudinary.com') && !url.includes('w_600')) {
+        return url.replace('/upload/', '/upload/w_600,q_auto,f_auto/');
+    }
+    return url;
+  };
+
   // --- 1. LOGIC CERDAS LOAD DATA ---
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -38,24 +47,17 @@ const FormEditLocationScreen = () => {
     if (id) {
       if (id !== editId) {
           setEditId(id);
-          
-          // Cek: Apakah kita punya data lokasi baru dari Peta?
           const hasNewLocation = params.latitude && params.longitude;
-          
-          // Jika ada lokasi baru, fetch data tapi JANGAN timpa lokasinya
           fetchReportData(id, !!hasNewLocation);
       }
     }
     
-    // SELALU UPDATE LOKASI DARI PARAMS JIKA ADA
     if (params.latitude && params.longitude) {
-      console.log("📍 Menggunakan Lokasi Baru dari Peta");
       setLatitude(params.latitude as string);
       setLongitude(params.longitude as string);
     }
   }, [params.id, params.latitude, params.longitude]);
 
-  // Fungsi Fetch dengan opsi 'skipLocation'
   const fetchReportData = async (id: string, skipLocation: boolean) => {
     setIsLoading(true);
     try {
@@ -63,13 +65,11 @@ const FormEditLocationScreen = () => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         
-        setImageUri(data.imageUrl);
+        setImageUri(data.imageUrl); // Simpan URL asli di state
         setDescription(data.description || '');
         setSeverity(data.severity || 'Medium');
 
-        // HANYA ambil lokasi dari DB kalau TIDAK ada lokasi baru dari peta
         if (!skipLocation) {
-            console.log("🔄 Mengambil Lokasi Lama dari Database");
             if (data.location?.latitude) {
                 setLatitude(String(data.location.latitude));
                 setLongitude(String(data.location.longitude));
@@ -77,10 +77,7 @@ const FormEditLocationScreen = () => {
                 setLatitude(String(data.latitude || ''));
                 setLongitude(String(data.longitude || ''));
             }
-        } else {
-            console.log("⚠️ Lokasi DB diabaikan (karena ada data baru dari peta)");
         }
-
       } else {
         Alert.alert("Error", "Data tidak ditemukan.");
         router.back();
@@ -115,11 +112,9 @@ const FormEditLocationScreen = () => {
 
   const handleUpdate = async () => {
     if (!editId) return Alert.alert("Error", "ID Hilang.");
-    
     setIsLoading(true);
     try {
       const url = await uploadImageToCloudinary(imageUri || '');
-      
       await updateDoc(doc(db, 'reports', editId), {
         imageUrl: url,
         location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) },
@@ -127,26 +122,22 @@ const FormEditLocationScreen = () => {
       });
       
       Alert.alert('Sukses', 'Data berhasil diperbarui!', [
-          { 
-            text: 'OK', 
-            onPress: () => router.navigate('/(tabs)/mapwebview') 
-          }
+          { text: 'OK', onPress: () => router.navigate('/(tabs)/mapwebview') }
       ]);
-
-    } catch (error: any) {
-      Alert.alert('Gagal', error.message);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error: any) { Alert.alert('Gagal', error.message); } finally { setIsLoading(false); }
   };
 
   return (
     <SafeAreaProvider style={{ backgroundColor: AppColors.background }}>
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Stack sudah di-import, jadi aman sekarang */}
         <Stack.Screen options={{ title: 'Edit Laporan', headerStyle: { backgroundColor: AppColors.surface }, headerTintColor: AppColors.textPrimary }} />
         <ScrollView contentContainerStyle={globalStyles.container}>
-          <ImagePickerCard imageUri={imageUri} onPress={pickImageFromGallery} isLoading={isLoading} />
+          {/* TAMPILKAN GAMBAR VERSI RINGAN (OPTIMIZED) */}
+          <ImagePickerCard 
+            imageUri={getOptimizedUrl(imageUri)} 
+            onPress={pickImageFromGallery} 
+            isLoading={isLoading} 
+          />
           <LocationCard latitude={latitude} longitude={longitude} onLatitudeChange={setLatitude} onLongitudeChange={setLongitude} onGetLocation={getMyLocation} onOpenMapPicker={openMapPicker} isLoading={isLoading} />
           <DetailsCard severity={severity} onSeverityChange={setSeverity} description={description} onDescriptionChange={setDescription} isLoading={isLoading} />
           <SubmitButton onPress={handleUpdate} isLoading={isLoading} label="Simpan Perubahan" />
