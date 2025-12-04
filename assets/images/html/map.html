@@ -6,103 +6,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
-        html, body, #map {
-            height: 100%;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Prevent scrollbars */
+        html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; }
+        .leaflet-popup-content-wrapper { border-radius: 8px; padding: 0; }
+        .leaflet-popup-content { margin: 0 !important; width: 240px !important; }
+        
+        /* Style Tombol Keren */
+        .btn-action {
+            border: none; padding: 6px 12px; border-radius: 4px; color: white; 
+            font-size: 11px; font-weight: bold; cursor: pointer; flex: 1;
         }
+        .btn-edit { background-color: #007AFF; margin-right: 4px; }
+        .btn-delete { background-color: #FF3B30; margin-left: 4px; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        // Initialize the map and set its view to a default location
-        const map = L.map('map').setView([-3.793, 102.265], 13); // Centered on Bengkulu City
+        const map = L.map('map').setView([-3.793, 102.265], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
 
-        // Add a tile layer from OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-
-        // Store markers in an array to manage them
         let markers = [];
 
-        // Function to clear all existing markers from the map
-        function clearMarkers() {
-            for(let marker of markers) {
-                map.removeLayer(marker);
+        // --- FUNGSI KIRIM SINYAL KE REACT NATIVE ---
+        function sendAction(type, id) {
+            if (window.ReactNativeWebView) {
+                // Kirim data JSON: { type: 'DELETE', id: 'abc12345' }
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: type, id: id }));
+            } else {
+                alert("Fitur ini hanya jalan di aplikasi HP!");
             }
-            markers = [];
         }
 
-        // Function to add new markers to the map, called from React Native
-        function addMarkersToMap(reports) {
-            clearMarkers();
+        function addMarkersToMap(reportsData) {
+            // Hapus marker lama
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            
             try {
-                // The 'reports' argument is a stringified JSON array, so parse it
-                const reportData = JSON.parse(reports);
-
-                if (Array.isArray(reportData)) {
-                    reportData.forEach(report => {
-                        // Support both nested (location.lat) and flat (latitude) coordinate structures
+                const data = reportsData;
+                if (Array.isArray(data)) {
+                    data.forEach(report => {
                         let lat, lng;
+                        // Logic Koordinat
+                        if (report.location?.latitude) { lat = parseFloat(report.location.latitude); lng = parseFloat(report.location.longitude); }
+                        else if (report.location?.lat) { lat = parseFloat(report.location.lat); lng = parseFloat(report.location.lng); }
+                        else { lat = parseFloat(report.latitude); lng = parseFloat(report.longitude); }
                         
-                        if (report.location && typeof report.location.lat === 'number' && typeof report.location.lng === 'number') {
-                            lat = report.location.lat;
-                            lng = report.location.lng;
-                        } else if (typeof report.latitude === 'number' && typeof report.longitude === 'number') {
-                            lat = report.latitude;
-                            lng = report.longitude;
-                        }
-                        
-                        // Only render if valid coordinates exist
-                        if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            const color = report.color || '#FF3B30';
                             
-                            // Define custom icon based on severity
-                            const iconHtml = `<div style="background-color: ${report.color || '#FF3B30'}; width: 28px; height: 28px; border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(255, 59, 48, 0.4);"><strong style="color: white; font-size: 14px; font-weight: bold;">!</strong></div>`;
-                            const customIcon = L.divIcon({
-                                html: iconHtml,
-                                className: '',
-                                iconSize: [28, 28],
-                                iconAnchor: [14, 14]
-                            });
+                            // HTML Bagian Foto
+                            let imageHtml = report.imageUrl ? 
+                                `<div style="width: 100%; height: 130px; overflow: hidden; border-top-left-radius: 8px; border-top-right-radius: 8px; background: #eee;">
+                                    <img src="${report.imageUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                                </div>` : 
+                                `<div style="height: 40px; background: #f0f0f0; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color:#999;">No Image</div>`;
 
-                            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
-                            
-                            // Create popup content
                             const popupContent = `
-                                <b>Laporan Kerusakan Jalan</b><br>
-                                <b>Tingkat Kerusakan:</b> ${report.severity || 'N/A'}<br>
-                                <b>Deskripsi:</b> ${report.description || 'Tidak ada deskripsi.'}<br>
-                                <b>Validasi:</b> ${report.voteCount || 0} suara<br>
-                                <b>Koordinat:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}
+                                <div style="font-family: sans-serif; font-size: 13px; color: #333;">
+                                    ${imageHtml}
+                                    <div style="padding: 12px;">
+                                        <div style="margin-bottom: 6px;">
+                                            <span style="background-color: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; text-transform: uppercase;">
+                                                ${report.severity || 'NORMAL'}
+                                            </span>
+                                        </div>
+                                        <div style="margin-bottom: 6px;">
+                                            <span style="color: #666; font-size: 11px; font-weight: bold;">Keterangan:</span><br>
+                                            <span style="line-height: 1.3;">${report.description || '-'}</span>
+                                        </div>
+                                        <div style="margin-bottom: 6px;">
+                                            <span style="color: #666; font-size: 11px; font-weight: bold;">Koordinat:</span><br>
+                                            <span style="font-family: monospace; background: #f4f4f4;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+                                        </div>
+                                        <div style="margin-top: 8px; display: flex; align-items: center;">
+                                            <span style="color: #666; font-size: 11px; font-weight: bold; margin-right: 5px;">Validasi:</span>
+                                            <span style="font-weight: bold; color: #333;">👍 ${report.voteCount || 0}</span>
+                                        </div>
+                                        
+                                        <div style="margin-top: 12px; display: flex; border-top: 1px solid #eee; padding-top: 8px;">
+                                            <button onclick="sendAction('EDIT', '${report.id}')" class="btn-action btn-edit">EDIT</button>
+                                            <button onclick="sendAction('DELETE', '${report.id}')" class="btn-action btn-delete">HAPUS</button>
+                                        </div>
+                                    </div>
+                                </div>
                             `;
-                            marker.bindPopup(popupContent);
 
-                            markers.push(marker);
+                            const iconHtml = `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`;
+                            const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
+                            
+                            L.marker([lat, lng], { icon: customIcon }).addTo(map).bindPopup(popupContent);
                         }
                     });
                 }
-                
-                console.log('Markers added: ' + markers.length);
-            } catch (e) {
-                // Use alert for debugging in WebView
-                alert('Gagal memproses data laporan: ' + e.message);
-            }
+            } catch (e) { console.error(e); }
         }
-
-        // --- Communication with React Native ---
-        // This listener waits for messages from the React Native host
-        document.addEventListener('message', function(event) {
-            const messageData = JSON.parse(event.data);
-            if (messageData.type === 'LOAD_MARKERS') {
-                addMarkersToMap(messageData.payload);
-            }
-        });
-
     </script>
 </body>
 </html>
