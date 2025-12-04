@@ -1,10 +1,13 @@
+import { CustomAlert } from '@/components/ui/CustomAlert';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export const ActionButtons = () => {
     const router = useRouter();
+    // State untuk mengontrol muncul/hilangnya popup About
+    const [aboutVisible, setAboutVisible] = useState(false);
 
     const buttonsRow1 = [
         {
@@ -28,9 +31,22 @@ export const ActionButtons = () => {
         {
             icon: 'information-outline',
             text: 'About',
-            onPress: () => Alert.alert('About Bengkulu Mulus', 'v1.0\n\nAplikasi pelaporan kerusakan jalan untuk Kota Bengkulu\n\nDeveloped with ❤️'),
+            // Saat ditekan, munculkan CustomAlert
+            onPress: () => setAboutVisible(true),
         },
     ];
+
+    
+    const aboutContent = 
+        "Bengkulu Mulus adalah aplikasi yang dirancang untuk melaporkan kerusakan infrastruktur jalan di Kota Bengkulu. Aplikasi ini memudahkan masyarakat untuk berkontribusi dalam pemantauan kondisi jalan secara real-time demi mewujudkan infrastruktur yang lebih baik.\n\n" +
+        "Dibuat oleh:\n" +
+        "Nama: Muhammad Naufal Hidayat\n" +
+        "NIM: 23/520500/SV/23249\n" +
+        "Sarjana Terapan Sistem Informasi Geografis\n" +
+        "Universitas Gadjah Mada\n\n" +
+        "Disusun untuk memenuhi Responsi\n" +
+        "Praktikum Pemrograman Geospasial: Perangkat Bergerak Lanjut (SVIG223542)\n" +
+        "Tahun 2025";
 
     return (
         <View>
@@ -58,6 +74,16 @@ export const ActionButtons = () => {
                     </TouchableOpacity>
                 ))}
             </View>
+
+            {/* --- CUSTOM ALERT UNTUK ABOUT --- */}
+            <CustomAlert 
+                visible={aboutVisible}
+                type="success" 
+                title="Apa itu Bengkulu Mulus?"
+                message={aboutContent}
+                confirmText="Close"
+                onConfirm={() => setAboutVisible(false)}
+            />
         </View>
     );
 };
