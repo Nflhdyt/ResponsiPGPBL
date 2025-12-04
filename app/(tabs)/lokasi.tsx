@@ -1,77 +1,76 @@
-import React from 'react';
-import { FlatList, StyleSheet, View, ActivityIndicator, Text, RefreshControl } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ReportCard } from '@/components/reports/ReportCard';
-import { useReportsFeed } from '@/hooks/useReportsFeed';
 import { AppColors } from '@/constants/theme';
+import { useReportsFeed } from '@/hooks/useReportsFeed';
+import React from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Use only SafeAreaView
 
 export default function DamagedRoadsFeedScreen() {
   const { reports, loading, refreshing, handleValidate, onRefresh } = useReportsFeed();
 
-  if (loading) {
+  // Loading State
+  if (loading && !refreshing) {
     return (
-      <SafeAreaProvider style={{ flex: 1, backgroundColor: AppColors.background }}>
-        <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={AppColors.primary} />
-          <Text style={styles.loadingText}>Loading road reports...</Text>
-        </SafeAreaView>
-      </SafeAreaProvider>
+          <Text style={styles.loadingText}>Memuat data laporan...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaProvider style={{ flex: 1, backgroundColor: AppColors.background }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <FlatList
-          data={reports}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ReportCard report={item} onValidate={handleValidate} />
-          )}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No road damage reports yet.</Text>
-              <Text style={styles.emptySubtext}>Be the first to report!</Text>
-            </View>
-          }
-        />
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <FlatList
+        data={reports}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <ReportCard report={item} onValidate={handleValidate} />
+        )}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[AppColors.primary]} />
+        }
+        contentContainerStyle={styles.listContent} // Style for the inner content
+        ListEmptyComponent={
+          <View style={styles.centerContainer}>
+            <Text style={styles.emptyText}>Belum ada laporan kerusakan.</Text>
+            <Text style={styles.emptySubtext}>Jadilah yang pertama melapor!</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  container: {
+    flex: 1, // CRITICAL: Ensure full height
+    backgroundColor: AppColors.background,
+  },
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 100, // Push down a bit if empty
+  },
+  listContent: {
+    paddingTop: 16,
+    paddingBottom: 100, // Extra padding at bottom for tab bar
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: AppColors.textSecondary,
-  },
-  listContainer: {
-    paddingVertical: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 100,
+    fontSize: 14,
+    color: '#666',
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: AppColors.textSecondary,
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 13,
-    color: AppColors.textSecondary,
+    fontSize: 14,
+    color: '#999',
   },
 });
