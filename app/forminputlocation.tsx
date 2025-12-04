@@ -7,12 +7,13 @@ import { auth, db } from '@/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection } from 'firebase/firestore'; // CUMA ADA ADD
+import { addDoc, collection } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+// IMPORT CUSTOM ALERT
+import { CustomAlert } from '@/components/ui/CustomAlert';
 
-// Warna Manual
 const AppColors = { primary: '#FF3B30', background: '#FFFFFF', surface: '#FFFFFF', textPrimary: '#000000', textSecondary: '#666666' };
 const CLOUD_NAME = 'ddlxrhe9n';
 const UPLOAD_PRESET = 'bengkulu';
@@ -28,7 +29,9 @@ const FormInputLocationScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // Cek parameter lokasi dari peta picker
+  // STATE ALERT
+  const [alertConfig, setAlertConfig] = useState({ visible: false, type: 'success', title: '', message: '', onConfirm: () => {} });
+
   useEffect(() => {
     if (params.latitude && params.longitude) {
       setLatitude(params.latitude as string);
@@ -36,27 +39,30 @@ const FormInputLocationScreen = () => {
     }
   }, [params.latitude, params.longitude]);
 
-  // --- LOGIC GAMBAR & LOKASI ---
+  // Helper tampilkan alert
+  const showAlert = (type: string, title: string, message: string, onConfirm = () => setAlertConfig(p => ({...p, visible: false}))) => {
+      setAlertConfig({ visible: true, type, title, message, onConfirm });
+  };
+
   const pickImageFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.3 });
       if (!result.canceled) setImageUri(result.assets[0].uri);
-    } catch (error) { Alert.alert('Error', 'Gagal membuka galeri.'); }
+    } catch (error) { showAlert('error', 'Error', 'Gagal membuka galeri.'); }
   };
 
   const getMyLocation = async () => {
     setIsLoading(true);
     try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return Alert.alert('Izin Ditolak', 'Perlu izin lokasi.');
+        if (status !== 'granted') return showAlert('error', 'Izin Ditolak', 'Perlu izin lokasi.');
         const loc = await Location.getCurrentPositionAsync({});
         setLatitude(String(loc.coords.latitude));
         setLongitude(String(loc.coords.longitude));
-    } catch (e) { Alert.alert('Error', 'Gagal GPS.'); } finally { setIsLoading(false); }
+    } catch (e) { showAlert('error', 'Error', 'Gagal GPS.'); } finally { setIsLoading(false); }
   };
 
   const openMapPicker = () => {
-    // Navigasi ke Peta (Mode Create)
     router.push({ pathname: '/LocationPicker', params: { latitude, longitude, returnTo: 'create' } });
   };
 
@@ -75,10 +81,9 @@ const FormInputLocationScreen = () => {
     return data.secure_url;
   };
 
-  // --- LOGIC SUBMIT (HANYA CREATE) ---
   const handleSubmit = async () => {
     if (!imageUri || !latitude || !longitude || !description.trim()) {
-      return Alert.alert('Error', 'Mohon lengkapi semua data.');
+      return showAlert('warning', 'Data Belum Lengkap', 'Mohon lengkapi foto, lokasi, dan deskripsi.');
     }
     setIsLoading(true);
     try {
@@ -91,12 +96,16 @@ const FormInputLocationScreen = () => {
         voteCount: 0
       };
 
-      // PASTI ADD DOC (CREATE)
       await addDoc(collection(db, 'reports'), reportData);
       
-      Alert.alert('Sukses', 'Laporan berhasil dikirim!', [{ text: 'OK', onPress: () => router.back() }]);
+      // SUKSES DENGAN CUSTOM ALERT
+      showAlert('success', 'Sukses!', 'Laporan berhasil dikirim!', () => {
+          setAlertConfig(prev => ({ ...prev, visible: false }));
+          router.back();
+      });
+
     } catch (error: any) {
-      Alert.alert('Gagal', error.message);
+      showAlert('error', 'Gagal', error.message);
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +121,14 @@ const FormInputLocationScreen = () => {
           <DetailsCard severity={severity} onSeverityChange={setSeverity} description={description} onDescriptionChange={setDescription} isLoading={isLoading} />
           <SubmitButton onPress={handleSubmit} isLoading={isLoading} label="Kirim Laporan" />
         </ScrollView>
+
+        <CustomAlert 
+            visible={alertConfig.visible} 
+            type={alertConfig.type as any} 
+            title={alertConfig.title} 
+            message={alertConfig.message} 
+            onConfirm={alertConfig.onConfirm} 
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );

@@ -9,8 +9,10 @@ import * as Location from 'expo-location';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+// IMPORT CUSTOM ALERT
+import { CustomAlert } from '@/components/ui/CustomAlert';
 
 const AppColors = { primary: '#FF3B30', background: '#FFFFFF', surface: '#FFFFFF', textPrimary: '#000000', textSecondary: '#666666' };
 const CLOUD_NAME = 'ddlxrhe9n';
@@ -24,26 +26,29 @@ const FormEditLocationScreen = () => {
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'Light' | 'Medium' | 'Heavy'>('Medium');
   const [isLoading, setIsLoading] = useState(false);
-  
   const [editId, setEditId] = useState<string | null>(null);
+  
+  // STATE ALERT
+  const [alertConfig, setAlertConfig] = useState({ visible: false, type: 'success', title: '', message: '', onConfirm: () => {} });
 
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // --- OPTIMASI GAMBAR (Agar Load Cepat) ---
+  // Helper
+  const showAlert = (type: string, title: string, message: string, onConfirm = () => setAlertConfig(p => ({...p, visible: false}))) => {
+      setAlertConfig({ visible: true, type, title, message, onConfirm });
+  };
+
   const getOptimizedUrl = (url: string | null) => {
     if (!url) return null;
-    // Jika url dari Cloudinary, kita minta versi kecil (width 600, quality auto)
     if (url.includes('cloudinary.com') && !url.includes('w_600')) {
         return url.replace('/upload/', '/upload/w_600,q_auto,f_auto/');
     }
     return url;
   };
 
-  // --- 1. LOGIC CERDAS LOAD DATA ---
   useEffect(() => {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
-
     if (id) {
       if (id !== editId) {
           setEditId(id);
@@ -51,7 +56,6 @@ const FormEditLocationScreen = () => {
           fetchReportData(id, !!hasNewLocation);
       }
     }
-    
     if (params.latitude && params.longitude) {
       setLatitude(params.latitude as string);
       setLongitude(params.longitude as string);
@@ -64,11 +68,9 @@ const FormEditLocationScreen = () => {
       const docSnap = await getDoc(doc(db, 'reports', id));
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
-        setImageUri(data.imageUrl); // Simpan URL asli di state
+        setImageUri(data.imageUrl);
         setDescription(data.description || '');
         setSeverity(data.severity || 'Medium');
-
         if (!skipLocation) {
             if (data.location?.latitude) {
                 setLatitude(String(data.location.latitude));
@@ -79,14 +81,9 @@ const FormEditLocationScreen = () => {
             }
         }
       } else {
-        Alert.alert("Error", "Data tidak ditemukan.");
-        router.back();
+        showAlert('error', "Error", "Data tidak ditemukan.", () => router.back());
       }
-    } catch (error) {
-      Alert.alert("Error", "Gagal memuat data.");
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error) { showAlert('error', "Error", "Gagal memuat data."); } finally { setIsLoading(false); }
   };
 
   const pickImageFromGallery = async () => {
@@ -98,10 +95,7 @@ const FormEditLocationScreen = () => {
   };
   
   const openMapPicker = () => {
-    router.replace({ 
-        pathname: '/LocationPicker', 
-        params: { latitude, longitude, returnTo: 'edit', editId: editId } 
-    });
+    router.replace({ pathname: '/LocationPicker', params: { latitude, longitude, returnTo: 'edit', editId: editId } });
   };
 
   const uploadImageToCloudinary = async (uri: string) => {
@@ -111,7 +105,7 @@ const FormEditLocationScreen = () => {
   };
 
   const handleUpdate = async () => {
-    if (!editId) return Alert.alert("Error", "ID Hilang.");
+    if (!editId) return showAlert('error', "Error", "ID Hilang.");
     setIsLoading(true);
     try {
       const url = await uploadImageToCloudinary(imageUri || '');
@@ -121,10 +115,17 @@ const FormEditLocationScreen = () => {
         severity, description, timestamp: new Date()
       });
       
-      Alert.alert('Sukses', 'Data berhasil diperbarui!', [
-          { text: 'OK', onPress: () => router.navigate('/(tabs)/mapwebview') }
-      ]);
-    } catch (error: any) { Alert.alert('Gagal', error.message); } finally { setIsLoading(false); }
+      // SUKSES DENGAN CUSTOM ALERT
+      showAlert('success', 'Sukses!', 'Data berhasil diperbarui!', () => {
+          setAlertConfig(prev => ({ ...prev, visible: false }));
+          router.navigate('/(tabs)/mapwebview');
+      });
+
+    } catch (error: any) {
+        showAlert('error', 'Gagal', error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -132,16 +133,19 @@ const FormEditLocationScreen = () => {
       <SafeAreaView style={{ flex: 1 }}>
         <Stack.Screen options={{ title: 'Edit Laporan', headerStyle: { backgroundColor: AppColors.surface }, headerTintColor: AppColors.textPrimary }} />
         <ScrollView contentContainerStyle={globalStyles.container}>
-          {/* TAMPILKAN GAMBAR VERSI RINGAN (OPTIMIZED) */}
-          <ImagePickerCard 
-            imageUri={getOptimizedUrl(imageUri)} 
-            onPress={pickImageFromGallery} 
-            isLoading={isLoading} 
-          />
+          <ImagePickerCard imageUri={getOptimizedUrl(imageUri)} onPress={pickImageFromGallery} isLoading={isLoading} />
           <LocationCard latitude={latitude} longitude={longitude} onLatitudeChange={setLatitude} onLongitudeChange={setLongitude} onGetLocation={getMyLocation} onOpenMapPicker={openMapPicker} isLoading={isLoading} />
           <DetailsCard severity={severity} onSeverityChange={setSeverity} description={description} onDescriptionChange={setDescription} isLoading={isLoading} />
           <SubmitButton onPress={handleUpdate} isLoading={isLoading} label="Simpan Perubahan" />
         </ScrollView>
+
+        <CustomAlert 
+            visible={alertConfig.visible} 
+            type={alertConfig.type as any} 
+            title={alertConfig.title} 
+            message={alertConfig.message} 
+            onConfirm={alertConfig.onConfirm} 
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );
