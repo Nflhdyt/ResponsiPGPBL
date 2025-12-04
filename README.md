@@ -1,50 +1,118 @@
-# Welcome to your Expo app
+# Bengkulu Mulus - Sistem Pelaporan Kerusakan Jalan
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Bengkulu Mulus** adalah aplikasi *mobile* berbasis Sistem Informasi Geografis Partisipatif (PGIS) untuk memetakan dan melaporkan kerusakan infrastruktur jalan di Kota Bengkulu. Aplikasi ini memanfaatkan data geospasial *real-time* yang memungkinkan masyarakat berkontribusi dalam pemantauan infrastruktur, visualisasi sebaran kerusakan via *heatmap*, serta analisis statistik kondisi jalan.
 
-## Get started
+Proyek ini dikembangkan untuk memenuhi tugas **Responsi Praktikum Pemrograman Perangkat Lunak Bergerak Lanjut (SVIG223542)**.
 
-1. Install dependencies
+## Daftar Isi
 
-   ```bash
-   npm install
-   ```
+- [Fitur Utama](#fitur-utama)
+- [Teknologi (Tech Stack)](#teknologi-tech-stack)
+- [Tampilan Aplikasi](#tampilan-aplikasi)
+- [Instalasi & Pengaturan](#instalasi--pengaturan)
+- [Struktur Proyek](#struktur-proyek)
+- [Author](#author)
 
-2. Start the app
+## Fitur Utama
 
-   ```bash
-   npx expo start
-   ```
+* **Pelaporan Kerusakan:** Pengguna dapat mengirim laporan lengkap dengan bukti foto (kamera/galeri), titik koordinat GPS presisi, tingkat kerusakan (Ringan, Sedang, Berat), dan deskripsi detail.
+* **Visualisasi Geospasial:** Integrasi peta interaktif menggunakan Leaflet.js untuk menampilkan sebaran titik kerusakan (marker) dan kepadatan area kerusakan (*heatmap*).
+* **Manajemen Data (CRUD):** Fitur lengkap untuk Membuat, Melihat, Mengedit, dan Menghapus laporan yang telah dikirim.
+* **Optimasi Gambar:** Kompresi gambar otomatis menggunakan Cloudinary untuk performa aplikasi yang lebih cepat dan hemat kuota.
+* **Dashboard Statistik:** Ringkasan data total laporan, tingkat urgensi perbaikan, dan metrik partisipasi masyarakat.
+* **Database Real-time:** Sinkronisasi data instan antar perangkat menggunakan Firebase Firestore.
 
-In the output, you'll find options to open the app in a
+## Teknologi (Tech Stack)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Proyek ini dibangun menggunakan teknologi modern berikut:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+* **Framework:** React Native (via Expo SDK 52)
+* **Bahasa:** TypeScript
+* **Routing:** Expo Router
+* **Database:** Firebase Firestore
+* **Storage:** Cloudinary API (untuk hosting gambar)
+* **Peta:** Leaflet.js (di-render via React Native WebView)
+* **UI Components:** Komponen kustom dengan styling modern dan ikon dari Lucide React Native.
 
-## Get a fresh project
+## Tampilan Aplikasi
 
-When you're ready, run:
+| Dashboard Utama | Visualisasi Heatmap | Form Pelaporan |
+|:---:|:---:|:---:|
+| <img src="./docs/screenshots/home.png" width="250"> | <img src="./docs/screenshots/map.png" width="250"> | <img src="./docs/screenshots/form.png" width="250"> |
 
-```bash
-npm run reset-project
-```
+| Fitur Edit Data | Notifikasi Kustom | Statistik |
+|:---:|:---:|:---:|
+| <img src="./docs/screenshots/edit.png" width="250"> | <img src="./docs/screenshots/alert.png" width="250"> | <img src="./docs/screenshots/stats.png" width="250"> |
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Instalasi & Pengaturan
 
-## Learn more
+Ikuti langkah-langkah berikut untuk menjalankan proyek di komputer lokal Anda.
 
-To learn more about developing your project with Expo, look at the following resources:
+### Prasyarat
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Pastikan Anda sudah menginstal:
+* **Node.js** (Disarankan versi LTS)
+* **npm** atau **yarn**
+* **Expo CLI**: `npm install -g expo-cli`
+* **Aplikasi Expo Go**: Terinstal di HP Android/iOS fisik Anda.
 
-## Join the community
+### Langkah Instalasi
 
-Join our community of developers creating universal apps.
+1.  **Clone Repository**
+    ```bash
+    git clone [https://github.com/username-anda/ResponsiPGPBL.git](https://github.com/username-anda/ResponsiPGPBL.git)
+    cd ResponsiPGPBL
+    ```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    # atau
+    yarn install
+    ```
+
+3.  **Konfigurasi Environment**
+    Proyek ini membutuhkan layanan eksternal (Firebase & Cloudinary). Buat file `.env` di *root directory* atau sesuaikan konfigurasi di `constants/firebase.ts`.
+
+    *Key yang dibutuhkan:*
+    * `FIREBASE_API_KEY`
+    * `FIREBASE_AUTH_DOMAIN`
+    * `FIREBASE_PROJECT_ID`
+    * `FIREBASE_STORAGE_BUCKET`
+    * `CLOUDINARY_CLOUD_NAME`
+    * `CLOUDINARY_API_KEY`
+    * `CLOUDINARY_UPLOAD_PRESET`
+
+4.  **Jalankan Aplikasi**
+    Mulai server development:
+    ```bash
+    npx expo start -c
+    ```
+    *Catatan: Flag `-c` digunakan untuk membersihkan cache agar aset termuat dengan benar.*
+
+5.  **Jalankan di HP**
+    Scan QR code yang muncul di terminal menggunakan aplikasi **Expo Go** di Android atau Kamera di iOS.
+
+## Struktur Proyek
+
+Aplikasi ini menggunakan arsitektur modular berbasis Expo Router:
+
+* `app/`: Berisi layar utama (screens) dan logika routing.
+    * `(tabs)/`: Navigasi menu bawah (Home, Peta, Statistik).
+    * `forminputlocation.tsx`: Layar input laporan baru.
+    * `formeditlocation.tsx`: Layar edit laporan.
+    * `LocationPicker.tsx`: Interface peta untuk memilih titik koordinat.
+* `assets/`: Aset gambar, font, dan file HTML untuk Leaflet.
+* `components/`: Komponen UI yang dapat digunakan kembali (Forms, Cards, Alerts).
+* `constants/`: Konstanta styling, tema warna, dan konfigurasi API.
+* `hooks/`: Custom React Hooks untuk fetching data (contoh: `useMapReports`).
+
+## Author
+
+**Muhammad Naufal Hidayat**
+* **NIM:** 23/520500/SV/23249
+* **Program Studi:** Sarjana Terapan Sistem Informasi Geografis
+* **Institusi:** Universitas Gadjah Mada
+
+---
+*Copyright © 2025 Bengkulu Mulus Project.*
