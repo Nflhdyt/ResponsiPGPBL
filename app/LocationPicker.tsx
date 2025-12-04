@@ -5,38 +5,23 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
-// DEFINISI WARNA MANUAL (Biar Anti Error)
-const AppColors = {
-    primary: '#FF3B30',
-    background: '#FFFFFF',
-    surface: '#FFFFFF',
-    textPrimary: '#000000',
-    textOnPrimary: '#FFFFFF',
-    border: '#E0E0E0',
-    error: '#FF3B30',
-};
+const AppColors = { primary: '#FF3B30', background: '#FFFFFF', surface: '#FFFFFF', textPrimary: '#000000', textOnPrimary: '#FFFFFF', border: '#E0E0E0', error: '#FF3B30' };
 
-// This is the component for the map picker screen using Leaflet in a WebView.
 const LocationPicker = () => {
   const router = useRouter();
-  // Ambil semua parameter (latitude, longitude, returnTo, editId)
+  // Receive 'savedImage' parameter
   const params = useLocalSearchParams();
   
   const webViewRef = useRef<WebView>(null);
-
-  const [initialLat, setInitialLat] = useState<number>(-3.7956); // Default Bengkulu
-  const [initialLng, setInitialLng] = useState<number>(102.2695);
-  const [currentMapCenter, setCurrentMapCenter] = useState<{ lat: number; lng: number }>({
-    lat: -3.7956,
-    lng: 102.2695,
-  });
+  const [currentMapCenter, setCurrentMapCenter] = useState<{ lat: number; lng: number }>({ lat: -3.7956, lng: 102.2695 });
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
+  const [initialLat, setInitialLat] = useState<number>(-3.7956);
+  const [initialLng, setInitialLng] = useState<number>(102.2695);
+
   useEffect(() => {
-    // Set initial map region based on params
     const lat = parseFloat(params.latitude as string ?? '0');
     const lng = parseFloat(params.longitude as string ?? '0');
-
     if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       setInitialLat(lat);
       setInitialLng(lng);
@@ -44,55 +29,7 @@ const LocationPicker = () => {
     }
   }, [params.latitude, params.longitude]);
 
-  // HTML content for the WebView
-  const generateHtml = (lat: number, lng: number) => `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>Leaflet Map</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-        <style>
-            body { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
-            #map { width: 100%; height: 100%; }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-        <script>
-            var map = L.map('map', { zoomControl: false }).setView([${lat}, ${lng}], 15);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-
-            map.on('load', function() {
-                var center = map.getCenter();
-                window.ReactNativeWebView.postMessage(JSON.stringify({ 
-                    type: 'mapLoaded', 
-                    lat: center.lat, 
-                    lng: center.lng 
-                }));
-            });
-
-            map.on('moveend', function() {
-                var center = map.getCenter();
-                window.ReactNativeWebView.postMessage(JSON.stringify({ 
-                    type: 'centerChange', 
-                    lat: center.lat, 
-                    lng: center.lng 
-                }));
-            });
-
-            setTimeout(function () {
-                map.invalidateSize();
-            }, 100);
-        </script>
-    </body>
-    </html>
-  `;
+  const generateHtml = (lat: number, lng: number) => `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" /><style>body{margin:0;height:100vh;}#map{width:100%;height:100%;}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script><script>var map=L.map('map',{zoomControl:false}).setView([${lat},${lng}],15);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);map.on('load',function(){window.ReactNativeWebView.postMessage(JSON.stringify({type:'mapLoaded',lat:map.getCenter().lat,lng:map.getCenter().lng}));});map.on('moveend',function(){var c=map.getCenter();window.ReactNativeWebView.postMessage(JSON.stringify({type:'centerChange',lat:c.lat,lng:c.lng}));});setTimeout(function(){map.invalidateSize();},100);</script></body></html>`;
 
   const onMessage = (event: any) => {
     try {
@@ -101,128 +38,60 @@ const LocationPicker = () => {
           setCurrentMapCenter({ lat: data.lat, lng: data.lng });
           setIsMapLoaded(true);
         }
-    } catch (e) {
-        console.log("Error parsing map message");
-    }
+    } catch (e) {}
   };
 
-  // --- LOGIC KONFIRMASI LOKASI (YANG SUDAH DIPERBAIKI) ---
+  // --- CONFIRMATION LOGIC (UPDATED: RETURN IMAGE) ---
   const handleConfirmLocation = () => {
-    // 1. Cek apakah kita datang dari halaman EDIT?
+    // Prepare data to return
+    const returnParams: any = {
+        latitude: currentMapCenter.lat.toString(),
+        longitude: currentMapCenter.lng.toString(),
+        // IMPORTANT: Return the saved image!
+        savedImage: params.savedImage 
+    };
+
     if (params.returnTo === 'edit') {
-        
-        console.log("↩️ Balik ke Form Edit bawa ID:", params.editId);
-        
-        // Pulang ke Form Edit (Bawa ID biar gak error)
         router.replace({
             pathname: "/formeditlocation",
             params: {
-                latitude: currentMapCenter.lat.toString(),
-                longitude: currentMapCenter.lng.toString(),
-                id: params.editId // <--- PENTING! Ini yang bikin dia gak jadi data baru
+                ...returnParams,
+                id: params.editId 
             },
         });
-
     } else {
-        // 2. Default: Pulang ke Form Input (Buat Baru)
-        console.log("↩️ Balik ke Form Input (Create)");
         router.replace({
             pathname: "/forminputlocation",
-            params: {
-                latitude: currentMapCenter.lat.toString(),
-                longitude: currentMapCenter.lng.toString(),
-            },
+            params: returnParams,
         });
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ title: 'Pilih Lokasi dari Peta' }} />
-      
+      <Stack.Screen options={{ title: 'Pilih Lokasi', headerBackTitle: 'Kembali' }} />
       <View style={styles.mapViewContainer}>
-        <WebView
-          ref={webViewRef}
-          originWhitelist={['*']}
-          source={{ html: generateHtml(initialLat, initialLng) }}
-          javaScriptEnabled={true}
-          onMessage={onMessage}
-          style={styles.webView}
-        />
-        
-        {/* Pin Tengah */}
-        {isMapLoaded && (
-          <View style={styles.fixedPin} pointerEvents="none">
-            <Feather name="map-pin" size={40} color={AppColors.error} />
-          </View>
-        )}
-
-        {!isMapLoaded && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={AppColors.primary} />
-            <Text style={styles.loadingText}>Memuat peta...</Text>
-          </View>
-        )}
+        <WebView ref={webViewRef} originWhitelist={['*']} source={{ html: generateHtml(initialLat, initialLng) }} javaScriptEnabled={true} onMessage={onMessage} style={styles.webView} />
+        {isMapLoaded && <View style={styles.fixedPin} pointerEvents="none"><Feather name="map-pin" size={40} color={AppColors.error} /></View>}
+        {!isMapLoaded && <View style={styles.loadingOverlay}><ActivityIndicator size="large" color={AppColors.primary} /><Text style={styles.loadingText}>Memuat peta...</Text></View>}
       </View>
-
-      {/* Tombol Konfirmasi */}
       <View style={styles.buttonContainer}>
-        <Pressable style={styles.button} onPress={handleConfirmLocation}>
-          <Text style={styles.buttonText}>Konfirmasi Lokasi</Text>
-        </Pressable>
+        <Pressable style={styles.button} onPress={handleConfirmLocation}><Text style={styles.buttonText}>Konfirmasi Lokasi</Text></Pressable>
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: AppColors.background,
-  },
-  mapViewContainer: {
-    flex: 1,
-    position: 'relative', 
-  },
-  webView: {
-    flex: 1,
-  },
-  fixedPin: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -20, 
-    marginTop: -40, 
-    zIndex: 1, 
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: AppColors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2, 
-  },
-  loadingText: {
-    marginTop: 10,
-    color: AppColors.textPrimary,
-  },
-  buttonContainer: {
-    padding: 20,
-    backgroundColor: AppColors.surface,
-    borderTopWidth: 1,
-    borderTopColor: AppColors.border,
-  },
-  button: {
-    backgroundColor: AppColors.primary,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: AppColors.textOnPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-}); 
+  container: { flex: 1, backgroundColor: AppColors.background },
+  mapViewContainer: { flex: 1, position: 'relative' },
+  webView: { flex: 1 },
+  fixedPin: { position: 'absolute', top: '50%', left: '50%', marginLeft: -20, marginTop: -40, zIndex: 1 },
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: AppColors.background, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  loadingText: { marginTop: 10, color: AppColors.textPrimary },
+  buttonContainer: { padding: 20, backgroundColor: AppColors.surface, borderTopWidth: 1, borderTopColor: AppColors.border },
+  button: { backgroundColor: AppColors.primary, padding: 15, borderRadius: 8, alignItems: 'center' },
+  buttonText: { color: AppColors.textOnPrimary, fontSize: 16, fontWeight: 'bold' },
+});
 
 export default LocationPicker;

@@ -2,6 +2,7 @@ import { DetailsCard } from '@/components/form/DetailsCard';
 import { ImagePickerCard } from '@/components/form/ImagePickerCard';
 import { LocationCard } from '@/components/form/LocationCard';
 import { SubmitButton } from '@/components/form/SubmitButton';
+import { CustomAlert } from '@/components/ui/CustomAlert';
 import { globalStyles } from '@/constants/styles';
 import { auth, db } from '@/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,8 +12,6 @@ import { addDoc, collection } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-// IMPORT CUSTOM ALERT
-import { CustomAlert } from '@/components/ui/CustomAlert';
 
 const AppColors = { primary: '#FF3B30', background: '#FFFFFF', surface: '#FFFFFF', textPrimary: '#000000', textSecondary: '#666666' };
 const CLOUD_NAME = 'ddlxrhe9n';
@@ -29,17 +28,23 @@ const FormInputLocationScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // STATE ALERT
   const [alertConfig, setAlertConfig] = useState({ visible: false, type: 'success', title: '', message: '', onConfirm: () => {} });
 
+  // --- LOGIC TO RECEIVE DATA BACK FROM MAP ---
   useEffect(() => {
+    // 1. Restore Location
     if (params.latitude && params.longitude) {
       setLatitude(params.latitude as string);
       setLongitude(params.longitude as string);
     }
-  }, [params.latitude, params.longitude]);
 
-  // Helper tampilkan alert
+    // 2. Restore Image (FIX FOR BUG)
+    // If state is empty but params has 'savedImage', restore it!
+    if (!imageUri && params.savedImage) {
+        setImageUri(params.savedImage as string);
+    }
+  }, [params.latitude, params.longitude, params.savedImage]);
+
   const showAlert = (type: string, title: string, message: string, onConfirm = () => setAlertConfig(p => ({...p, visible: false}))) => {
       setAlertConfig({ visible: true, type, title, message, onConfirm });
   };
@@ -63,7 +68,16 @@ const FormInputLocationScreen = () => {
   };
 
   const openMapPicker = () => {
-    router.push({ pathname: '/LocationPicker', params: { latitude, longitude, returnTo: 'create' } });
+    // --- PASS THE IMAGE URI TO THE MAP SCREEN ---
+    router.push({ 
+        pathname: '/LocationPicker', 
+        params: { 
+            latitude, 
+            longitude, 
+            returnTo: 'create',
+            savedImage: imageUri // <--- CRITICAL FIX: Pass image here
+        } 
+    });
   };
 
   const uploadImageToCloudinary = async (uri: string) => {
@@ -98,7 +112,6 @@ const FormInputLocationScreen = () => {
 
       await addDoc(collection(db, 'reports'), reportData);
       
-      // SUKSES DENGAN CUSTOM ALERT
       showAlert('success', 'Sukses!', 'Laporan berhasil dikirim!', () => {
           setAlertConfig(prev => ({ ...prev, visible: false }));
           router.back();
