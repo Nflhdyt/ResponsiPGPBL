@@ -7,14 +7,7 @@ import { Platform } from 'react-native';
 
 // Firebase Configuration for Bengkulu Mulus - Road Repair Reporting App
 const firebaseConfig = {
-  apiKey: 'AIzaSyCHYMD2z1-Ph4iV8ira3TBvK-tq2nmw1KM',
-  authDomain: 'nfl-reactnative.firebaseapp.com',
-  databaseURL: 'https://nfl-reactnative-default-rtdb.firebaseio.com',
-  projectId: 'nfl-reactnative',
-  storageBucket: 'nfl-reactnative.firebasestorage.app',
-  messagingSenderId: '962146808958',
-  appId: '1:962146808958:web:bfe6dbe0511a232778142f',
-  measurementId: 'G-M52EQ30YBT',
+ //Isi dengan Konfig Database anda
 };
 
 // Initialize Firebase
@@ -32,11 +25,11 @@ const storage = getStorage(app);
 // Conditionally initialize Analytics only on web or if supported
 let analytics;
 if (Platform.OS === 'web') {
-  analytics = getAnalytics(app);
+  analytics = getAnalytic(app);
 } else {
   isSupported().then((result) => {
     if (result) {
-      analytics = getAnalytics(app);
+      analytics = getAnalytic(app);
     }
   });
 }
