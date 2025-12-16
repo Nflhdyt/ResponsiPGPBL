@@ -25,11 +25,11 @@ const storage = getStorage(app);
 // Conditionally initialize Analytics only on web or if supported
 let analytics;
 if (Platform.OS === 'web') {
-  analytics = getAnalytic(app);
+  analytics = getAnalytics(app);
 } else {
   isSupported().then((result) => {
     if (result) {
-      analytics = getAnalytic(app);
+      analytics = getAnalytics(app);
     }
   });
 }
